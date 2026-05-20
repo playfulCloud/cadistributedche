@@ -5,9 +5,9 @@ import (
 )
 
 type Store interface {
-	Put(key string, value string) (string, error)
-	Get(key string) (string, error)
-	Delete(key string) (string, error)
+	Put(key string, value string) (string, bool, error)
+	Get(key string) (string, bool, error)
+	Delete(key string) (bool, error)
 }
 
 type KeyValueStore struct {
@@ -21,38 +21,32 @@ func NewKeyValueStore() *KeyValueStore {
 	}
 }
 
-func (k *KeyValueStore) Put(key string, value string) (string, error) {
+func (k *KeyValueStore) Put(key string, value string) (string, bool, error) {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
 	previousValue, exists := k.storage[key]
 	k.storage[key] = value
-	if !exists {
-		return "", nil
-	}
-	return previousValue, nil
+	return previousValue, exists, nil
 
 }
 
-func (k *KeyValueStore) Get(key string) (string, error) {
+func (k *KeyValueStore) Get(key string) (string, bool, error) {
 	k.mutex.RLock()
 	defer k.mutex.RUnlock()
 
 	value, exists := k.storage[key]
-	if !exists {
-		return "", nil
-	}
-	return value, nil
+	return value, exists, nil
 
 }
 
-func (k *KeyValueStore) Delete(key string) (string, error) {
+func (k *KeyValueStore) Delete(key string) (bool, error) {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 	_, exists := k.storage[key]
 	if !exists {
-		return "", nil
+		return false, nil
 	}
 	delete(k.storage, key)
-	return key, nil
+	return true, nil
 }

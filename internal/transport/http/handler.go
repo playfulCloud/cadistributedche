@@ -27,6 +27,7 @@ func (h *StorageHandler) handleStorageTrafic(w http.ResponseWriter, r *http.Requ
 	case http.MethodDelete:
 		h.handleDeleteStorage(w, r)
 	default:
+		w.Header().Set("Allow", "GET, PUT, DELETE")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
@@ -40,14 +41,16 @@ func (h *StorageHandler) handleGetStorage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	value, err := h.storage.Get(key)
+	value, found, err := h.storage.Get(key)
 
 	if err != nil {
 		http.Error(w, "Internal Server error", http.StatusInternalServerError)
+		return
 	}
 
-	if value == "" {
+	if !found {
 		http.Error(w, "Not found", http.StatusNotFound)
+		return
 	}
 
 	writeJson(w, http.StatusOK, map[string]string{
@@ -66,21 +69,26 @@ func (h *StorageHandler) handlePutStorage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := h.storage.Put(req.Key, req.Value)
+	if req.Key == "" {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	_, existed, err := h.storage.Put(req.Key, req.Value)
 
 	if err != nil {
 		http.Error(w, "Internal Server error", http.StatusInternalServerError)
 		return
 	}
 
-	if result == "" {
+	if !existed {
 		writeJson(w, http.StatusCreated, map[string]string{
 			"status": "created",
 		})
 		return
 	}
 
-	writeJson(w, http.StatusCreated, map[string]string{
+	writeJson(w, http.StatusOK, map[string]string{
 		"status": "updated",
 	})
 }
@@ -91,16 +99,18 @@ func (h *StorageHandler) handleDeleteStorage(w http.ResponseWriter, r *http.Requ
 
 	if key == "" {
 		http.Error(w, "Missing querry param: key", http.StatusBadRequest)
+		return
 	}
 
-	result, err := h.storage.Delete(key)
+	found, err := h.storage.Delete(key)
 
 	if err != nil {
 		http.Error(w, "Internal Server error", http.StatusInternalServerError)
+		return
 	}
 
-	if result == "" {
-		writeJson(w, http.StatusNotFound, result)
+	if !found {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 

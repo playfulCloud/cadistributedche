@@ -110,15 +110,15 @@ func TestConcurrentWritesDeletesFinalState(t *testing.T) {
 	wg.Wait()
 
 	for i := range 100 {
-		value, _ := store.Get(strconv.Itoa(i))
-		if value != "" {
+		_, exists, _ := store.Get(strconv.Itoa(i))
+		if exists {
 			t.Fatalf("expected key %d to be deleted", i)
 		}
 	}
 
 	for i := 100; i < 200; i++ {
-		value, _ := store.Get(strconv.Itoa(i))
-		if value == "" {
+		value, exists, _ := store.Get(strconv.Itoa(i))
+		if !exists {
 			t.Fatalf("expected key %d to exist", i)
 		}
 		if value != strconv.Itoa(i) {
@@ -130,39 +130,79 @@ func TestConcurrentWritesDeletesFinalState(t *testing.T) {
 func TestPutReturnsPreviousValue(t *testing.T) {
 	store := NewKeyValueStore()
 
-	prev, _ := store.Put("key", "first")
+	prev, existed, _ := store.Put("key", "first")
 	if prev != "" {
 		t.Fatalf("expected empty previous value, got %s", prev)
 	}
+	if existed {
+		t.Fatal("expected key to be new")
+	}
 
-	prev, _ = store.Put("key", "second")
+	prev, existed, _ = store.Put("key", "second")
 	if prev != "first" {
 		t.Fatalf("expected previous value first, got %s", prev)
 	}
+	if !existed {
+		t.Fatal("expected key to exist")
+	}
 }
 
-func TestDeleteReturnsDeletedKey(t *testing.T) {
+func TestPutDetectsExistingEmptyValue(t *testing.T) {
+	store := NewKeyValueStore()
+
+	_, existed, _ := store.Put("key", "")
+	if existed {
+		t.Fatal("expected key to be new")
+	}
+
+	prev, existed, _ := store.Put("key", "second")
+	if prev != "" {
+		t.Fatalf("expected empty previous value, got %s", prev)
+	}
+	if !existed {
+		t.Fatal("expected key to exist")
+	}
+}
+
+func TestDeleteReturnsFound(t *testing.T) {
 	store := NewKeyValueStore()
 
 	store.Put("key", "value")
 
 	deleted, _ := store.Delete("key")
-	if deleted != "key" {
-		t.Fatalf("expected deleted key, got %s", deleted)
+	if !deleted {
+		t.Fatal("expected key to be deleted")
 	}
 
-	value, _ := store.Get("key")
-	if value != "" {
-		t.Fatalf("expected key to be deleted, got %s", value)
+	_, exists, _ := store.Get("key")
+	if exists {
+		t.Fatal("expected key to be deleted")
 	}
 }
 
 func TestGetMissingKey(t *testing.T) {
 	store := NewKeyValueStore()
 
-	value, _ := store.Get("missing")
+	value, exists, _ := store.Get("missing")
 	if value != "" {
 		t.Fatalf("expected empty value, got %s", value)
+	}
+	if exists {
+		t.Fatal("expected key to be missing")
+	}
+}
+
+func TestGetExistingEmptyValue(t *testing.T) {
+	store := NewKeyValueStore()
+
+	store.Put("key", "")
+
+	value, exists, _ := store.Get("key")
+	if value != "" {
+		t.Fatalf("expected empty value, got %s", value)
+	}
+	if !exists {
+		t.Fatal("expected key to exist")
 	}
 }
 
