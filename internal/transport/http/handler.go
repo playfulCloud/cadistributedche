@@ -18,7 +18,7 @@ func NewStorageHandler(storage store.Store) *StorageHandler {
 	}
 }
 
-func (h *StorageHandler) handleStorageTrafic(w http.ResponseWriter, r *http.Request) {
+func (h *StorageHandler) handleStorage(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		h.handleGetStorage(w, r)

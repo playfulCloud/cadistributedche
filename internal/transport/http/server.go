@@ -18,7 +18,7 @@ func NewServer(storageHandler *StorageHandler) *Server {
 func (s *Server) Run() {
 
 	router := http.NewServeMux()
-	router.HandleFunc("/storage", s.storageHandler.handleStorageTrafic)
+	router.HandleFunc("/storage", s.storageHandler.handleStorage)
 
 	handler := loggingMiddleware(router)
 

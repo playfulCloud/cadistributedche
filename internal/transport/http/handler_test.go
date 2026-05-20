@@ -162,7 +162,7 @@ func TestStorageHandler(t *testing.T) {
 			req := httptest.NewRequest(tt.httpMethod, tt.url, strings.NewReader(tt.body))
 			rr := httptest.NewRecorder()
 
-			h.handleStorageTrafic(rr, req)
+			h.handleStorage(rr, req)
 
 			if rr.Code != tt.status {
 				t.Fatalf("The status code expected to be %d but got %d", tt.status, rr.Code)
