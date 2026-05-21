@@ -7,7 +7,7 @@ import (
 
 func main() {
 
-	storage := store.NewKeyValueStore()
+	storage := store.NewKeyValueStore(&store.ClockProvider{})
 	storageHandler := http.NewStorageHandler(storage)
 	server := http.NewServer(storageHandler)
 	server.Run()

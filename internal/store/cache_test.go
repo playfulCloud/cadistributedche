@@ -4,10 +4,29 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
+)
+
+var (
+	olderDate = time.Date(
+		2024,
+		time.January,
+		10,
+		12, 0, 0, 0,
+		time.UTC,
+	)
+
+	newerDate = time.Date(
+		2026,
+		time.May,
+		21,
+		15, 30, 0, 0,
+		time.UTC,
+	)
 )
 
 func TestConcurrentReadsWrites(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 
 	store.Put("cloud", "playful")
 	var wg sync.WaitGroup
@@ -29,7 +48,7 @@ func TestConcurrentReadsWrites(t *testing.T) {
 }
 
 func TestConcurrentWrites(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 
 	store.Put("cloud", "playful")
 	var wg sync.WaitGroup
@@ -47,7 +66,7 @@ func TestConcurrentWrites(t *testing.T) {
 }
 
 func TestConcurrentDeletes(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 	populateStore(store)
 	var wg sync.WaitGroup
 
@@ -64,7 +83,7 @@ func TestConcurrentDeletes(t *testing.T) {
 }
 
 func TestConcurrentWritesDeletes(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 	populateStore(store)
 	var wg sync.WaitGroup
 
@@ -87,7 +106,7 @@ func TestConcurrentWritesDeletes(t *testing.T) {
 }
 
 func TestConcurrentWritesDeletesFinalState(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 	populateStore(store)
 
 	var wg sync.WaitGroup
@@ -128,7 +147,7 @@ func TestConcurrentWritesDeletesFinalState(t *testing.T) {
 }
 
 func TestPutReturnsPreviousValue(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 
 	prev, existed, _ := store.Put("key", "first")
 	if prev != "" {
@@ -148,7 +167,7 @@ func TestPutReturnsPreviousValue(t *testing.T) {
 }
 
 func TestPutDetectsExistingEmptyValue(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 
 	_, existed, _ := store.Put("key", "")
 	if existed {
@@ -165,7 +184,7 @@ func TestPutDetectsExistingEmptyValue(t *testing.T) {
 }
 
 func TestDeleteReturnsFound(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 
 	store.Put("key", "value")
 
@@ -181,7 +200,7 @@ func TestDeleteReturnsFound(t *testing.T) {
 }
 
 func TestGetMissingKey(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 
 	value, exists, _ := store.Get("missing")
 	if value != "" {
@@ -193,7 +212,7 @@ func TestGetMissingKey(t *testing.T) {
 }
 
 func TestGetExistingEmptyValue(t *testing.T) {
-	store := NewKeyValueStore()
+	store := NewKeyValueStore(provideFakeClock())
 
 	store.Put("key", "")
 
@@ -206,8 +225,56 @@ func TestGetExistingEmptyValue(t *testing.T) {
 	}
 }
 
+func TestCleanUpExpired(t *testing.T) {
+	store := &KeyValueStore{
+		storage: storageWithExpiredEntries(),
+		clock:   provideFakeClock(),
+		ttl:     time.Duration(30) * time.Second,
+	}
+
+	store.CleanUpExpired()
+	storageSize := len(store.storage)
+	if storageSize != 0 {
+		t.Fatalf("Expected storage to be empty after clean but got %d elements", storageSize)
+	}
+}
+
 func populateStore(store Store) {
 	for i := range 100 {
 		store.Put(strconv.Itoa(i), strconv.Itoa(i))
+	}
+}
+
+func storageWithExpiredEntries() map[string]KeyValueEntry {
+	return map[string]KeyValueEntry{
+		"user:1": {
+			key:       "user:1",
+			value:     "playful",
+			createdAt: olderDate,
+		},
+		"user:2": {
+			key:       "user:2",
+			value:     "cloud",
+			createdAt: olderDate,
+		},
+		"user:3": {
+			key:       "user:3",
+			value:     "unemployed",
+			createdAt: olderDate,
+		},
+	}
+}
+
+type FakeClock struct {
+	FixedTime time.Time
+}
+
+func (f FakeClock) Now() time.Time {
+	return f.FixedTime
+}
+
+func provideFakeClock() FakeClock {
+	return FakeClock{
+		FixedTime: newerDate,
 	}
 }

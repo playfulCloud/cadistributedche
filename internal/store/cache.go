@@ -2,6 +2,7 @@ package store
 
 import (
 	"sync"
+	"time"
 )
 
 type Store interface {
@@ -10,14 +11,27 @@ type Store interface {
 	Delete(key string) (bool, error)
 }
 
-type KeyValueStore struct {
-	storage map[string]string
-	mutex   sync.RWMutex
+type ExpiringStore interface {
+	CleanUpExpired()
 }
 
-func NewKeyValueStore() *KeyValueStore {
+type KeyValueStore struct {
+	storage map[string]KeyValueEntry
+	mutex   sync.RWMutex
+	clock   Clock
+	ttl     time.Duration
+}
+
+type KeyValueEntry struct {
+	key       string
+	value     string
+	createdAt time.Time
+}
+
+func NewKeyValueStore(clock Clock) *KeyValueStore {
 	return &KeyValueStore{
-		storage: make(map[string]string),
+		storage: make(map[string]KeyValueEntry),
+		clock:   clock,
 	}
 }
 
@@ -25,9 +39,13 @@ func (k *KeyValueStore) Put(key string, value string) (string, bool, error) {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
-	previousValue, exists := k.storage[key]
-	k.storage[key] = value
-	return previousValue, exists, nil
+	previousEntry, exists := k.storage[key]
+	k.storage[key] = KeyValueEntry{
+		key:       key,
+		value:     value,
+		createdAt: k.clock.Now(),
+	}
+	return previousEntry.value, exists, nil
 
 }
 
@@ -35,8 +53,8 @@ func (k *KeyValueStore) Get(key string) (string, bool, error) {
 	k.mutex.RLock()
 	defer k.mutex.RUnlock()
 
-	value, exists := k.storage[key]
-	return value, exists, nil
+	entry, exists := k.storage[key]
+	return entry.value, exists, nil
 
 }
 
@@ -49,4 +67,16 @@ func (k *KeyValueStore) Delete(key string) (bool, error) {
 	}
 	delete(k.storage, key)
 	return true, nil
+}
+
+func (k *KeyValueStore) CleanUpExpired() {
+	k.mutex.Lock()
+	defer k.mutex.Unlock()
+	t := k.clock.Now()
+	for key, value := range k.storage {
+		diff := t.Sub(value.createdAt)
+		if diff >= k.ttl {
+			delete(k.storage, key)
+		}
+	}
 }
