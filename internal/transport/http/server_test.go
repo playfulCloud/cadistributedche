@@ -8,8 +8,6 @@ import (
 	"github.com/playfulCloud/cadistributedche/internal/config"
 )
 
-// TestSee
-
 func TestServerShouldShutDown(t *testing.T) {
 	storageHandler := NewStorageHandler(&FakeStore{})
 	server := NewServer(storageHandler, testServerConfig())

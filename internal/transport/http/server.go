@@ -17,7 +17,7 @@ type Server struct {
 
 func NewServer(storageHandler *StorageHandler, cfg config.ServerConfig) *Server {
 	router := http.NewServeMux()
-	router.HandleFunc("/storage", storageHandler.handleStorage)
+	router.HandleFunc("/cache/{key}", storageHandler.handleCache)
 
 	handler := loggingMiddleware(router)
 	return &Server{

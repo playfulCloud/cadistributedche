@@ -6,12 +6,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestStorageHandler(t *testing.T) {
 	tests := []struct {
 		name       string
 		body       string
+		key        string
 		url        string
 		status     int
 		httpMethod string
@@ -20,89 +22,115 @@ func TestStorageHandler(t *testing.T) {
 		store      FakeStore
 	}{
 		{
-			name:       "PUT Element in store exists",
-			body:       `{"key":"exists","value":"value"}`,
-			url:        "/storage",
+			name:       "PUT element in store exists",
+			body:       "value",
+			key:        "exists",
+			url:        "/cache/exists",
 			status:     http.StatusOK,
 			httpMethod: http.MethodPut,
 			response:   `{"status":"updated"}` + "\n",
 		},
 		{
-			name:       "PUT Element does not exist in store",
-			body:       `{"key":"new","value":"value"}`,
-			url:        "/storage",
+			name:       "PUT element does not exist in store",
+			body:       "value",
+			key:        "new",
+			url:        "/cache/new",
 			status:     http.StatusCreated,
 			httpMethod: http.MethodPut,
 			response:   `{"status":"created"}` + "\n",
 		},
 		{
-			name:       "PUT Element exists with empty previous value",
-			body:       `{"key":"empty-value","value":"value"}`,
-			url:        "/storage",
+			name:       "PUT element exists with empty previous value",
+			body:       "value",
+			key:        "empty-value",
+			url:        "/cache/empty-value",
 			status:     http.StatusOK,
 			httpMethod: http.MethodPut,
 			response:   `{"status":"updated"}` + "\n",
 		},
 		{
-			name:       "PUT invalid body",
-			body:       `{`,
-			url:        "/storage",
+			name:       "PUT with ttl query param",
+			body:       "value",
+			key:        "new",
+			url:        "/cache/new?ttl=10s",
+			status:     http.StatusCreated,
+			httpMethod: http.MethodPut,
+			response:   `{"status":"created"}` + "\n",
+			store: FakeStore{
+				put: func(key string, value string, ttl time.Duration) (string, bool, error) {
+					if ttl != 10*time.Second {
+						return "", false, errors.New("unexpected ttl")
+					}
+					return "", false, nil
+				},
+			},
+		},
+		{
+			name:       "PUT invalid ttl",
+			body:       "value",
+			key:        "new",
+			url:        "/cache/new?ttl=invalid",
 			status:     http.StatusBadRequest,
 			httpMethod: http.MethodPut,
-			response:   "Invalid request body\n",
+			response:   "Invalid ttl query param\n",
 		},
 		{
 			name:       "PUT missing key",
-			body:       `{"value":"value"}`,
-			url:        "/storage",
+			body:       "value",
+			url:        "/cache/",
 			status:     http.StatusBadRequest,
 			httpMethod: http.MethodPut,
-			response:   "Invalid request body\n",
+			response:   "Missing path param: key\n",
 		},
 		{
 			name:       "PUT store error",
-			body:       `{"key":"error","value":"value"}`,
-			url:        "/storage",
+			body:       "value",
+			key:        "error",
+			url:        "/cache/error",
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodPut,
 			response:   "Internal server error\n",
 			store: FakeStore{
-				put: func(key string, value string) (string, bool, error) {
+				put: func(key string, value string, ttl time.Duration) (string, bool, error) {
 					return "", false, errors.New("some error related with store")
 				},
 			},
 		},
 		{
-			name:       "GET Element in store exists",
-			url:        "/storage?key=exists",
+			name:       "GET element in store exists",
+			key:        "exists",
+			url:        "/cache/exists",
 			status:     http.StatusOK,
 			httpMethod: http.MethodGet,
 			response:   `{"key":"exists","value":"value"}` + "\n",
 		},
 		{
-			name:       "GET Element exists with empty value",
-			url:        "/storage?key=empty-value",
+			name:       "GET element exists with empty value",
+			key:        "empty-value",
+			url:        "/cache/empty-value",
 			status:     http.StatusOK,
 			httpMethod: http.MethodGet,
 			response:   `{"key":"empty-value","value":""}` + "\n",
 		},
 		{
-			name:       "GET Element does not exist in store",
-			url:        "/storage?key=empty",
+			name:       "GET element does not exist in store",
+			key:        "empty",
+			url:        "/cache/empty",
 			status:     http.StatusNotFound,
 			httpMethod: http.MethodGet,
 			response:   "Not found\n",
 		},
 		{
 			name:       "GET missing key",
-			url:        "/storage",
+			url:        "/cache/",
 			status:     http.StatusBadRequest,
 			httpMethod: http.MethodGet,
-			response:   "Missing query param: key\n",
+			response:   "Missing path param: key\n",
 		},
 		{
 			name:       "GET store error",
-			url:        "/storage?key=exists",
+			key:        "exists",
+			url:        "/cache/exists",
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodGet,
 			response:   "Internal server error\n",
@@ -113,28 +141,31 @@ func TestStorageHandler(t *testing.T) {
 			},
 		},
 		{
-			name:       "DELETE Element in store exists",
-			url:        "/storage?key=exists",
+			name:       "DELETE element in store exists",
+			key:        "exists",
+			url:        "/cache/exists",
 			status:     http.StatusNoContent,
 			httpMethod: http.MethodDelete,
 		},
 		{
-			name:       "DELETE Element does not exist in store",
-			url:        "/storage?key=empty",
+			name:       "DELETE element does not exist in store",
+			key:        "empty",
+			url:        "/cache/empty",
 			status:     http.StatusNotFound,
 			httpMethod: http.MethodDelete,
 			response:   "Not found\n",
 		},
 		{
 			name:       "DELETE missing key",
-			url:        "/storage",
+			url:        "/cache/",
 			status:     http.StatusBadRequest,
 			httpMethod: http.MethodDelete,
-			response:   "Missing query param: key\n",
+			response:   "Missing path param: key\n",
 		},
 		{
 			name:       "DELETE store error",
-			url:        "/storage?key=exists",
+			key:        "exists",
+			url:        "/cache/exists",
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodDelete,
 			response:   "Internal server error\n",
@@ -146,8 +177,9 @@ func TestStorageHandler(t *testing.T) {
 		},
 		{
 			name:       "POST method not allowed",
-			body:       `{"key":"exists","value":"value"}`,
-			url:        "/storage",
+			body:       "value",
+			key:        "exists",
+			url:        "/cache/exists",
 			status:     http.StatusMethodNotAllowed,
 			httpMethod: http.MethodPost,
 			response:   "method not allowed\n",
@@ -160,9 +192,10 @@ func TestStorageHandler(t *testing.T) {
 			h := NewStorageHandler(f)
 
 			req := httptest.NewRequest(tt.httpMethod, tt.url, strings.NewReader(tt.body))
+			req.SetPathValue("key", tt.key)
 			rr := httptest.NewRecorder()
 
-			h.handleStorage(rr, req)
+			h.handleCache(rr, req)
 
 			if rr.Code != tt.status {
 				t.Fatalf("The status code expected to be %d but got %d", tt.status, rr.Code)
@@ -181,7 +214,7 @@ func TestStorageHandler(t *testing.T) {
 }
 
 type FakeStore struct {
-	put    func(key string, value string) (string, bool, error)
+	put    func(key string, value string, ttl time.Duration) (string, bool, error)
 	get    func(key string) (string, bool, error)
 	delete func(key string) (bool, error)
 }
@@ -199,9 +232,9 @@ func (f *FakeStore) Get(key string) (string, bool, error) {
 	return "value", true, nil
 }
 
-func (f *FakeStore) Put(key string, value string) (string, bool, error) {
+func (f *FakeStore) Put(key string, value string, ttl time.Duration) (string, bool, error) {
 	if f.put != nil {
-		return f.put(key, value)
+		return f.put(key, value, ttl)
 	}
 	if key == "exists" {
 		return "previousValue", true, nil
@@ -210,7 +243,7 @@ func (f *FakeStore) Put(key string, value string) (string, bool, error) {
 		return "", true, nil
 	}
 	if key == "error" {
-		return "", false, errors.New("Some error related with store")
+		return "", false, errors.New("some error related with store")
 	}
 	return "", false, nil
 }

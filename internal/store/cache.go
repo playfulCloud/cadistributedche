@@ -8,7 +8,7 @@ import (
 )
 
 type Store interface {
-	Put(key string, value string) (string, bool, error)
+	Put(key string, value string, ttl time.Duration) (string, bool, error)
 	Get(key string) (string, bool, error)
 	Delete(key string) (bool, error)
 }
@@ -28,6 +28,7 @@ type KeyValueEntry struct {
 	key       string
 	value     string
 	createdAt time.Time
+	ttl       time.Duration
 }
 
 func NewKeyValueStore(clock Clock, ttl time.Duration) *KeyValueStore {
@@ -38,17 +39,23 @@ func NewKeyValueStore(clock Clock, ttl time.Duration) *KeyValueStore {
 	}
 }
 
-func (k *KeyValueStore) Put(key string, value string) (string, bool, error) {
+func (k *KeyValueStore) Put(key string, value string, ttl time.Duration) (string, bool, error) {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
 	previousEntry, exists := k.storage[key]
+	entryTtl := ttl
+	if ttl == 0 {
+		entryTtl = k.ttl
+	}
+
 	k.storage[key] = KeyValueEntry{
 		key:       key,
 		value:     value,
 		createdAt: k.clock.Now(),
+		ttl:       entryTtl,
 	}
-	if !exists || k.isExpired(previousEntry.createdAt) {
+	if !exists || k.isExpired(previousEntry) {
 		return "", false, nil
 	}
 	return previousEntry.value, true, nil
@@ -60,7 +67,7 @@ func (k *KeyValueStore) Get(key string) (string, bool, error) {
 	defer k.mutex.RUnlock()
 
 	entry, exists := k.storage[key]
-	if !exists || k.isExpired(entry.createdAt) {
+	if !exists || k.isExpired(entry) {
 		return "", false, nil
 	}
 
@@ -72,7 +79,7 @@ func (k *KeyValueStore) Delete(key string) (bool, error) {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 	entry, exists := k.storage[key]
-	if !exists || k.isExpired(entry.createdAt) {
+	if !exists || k.isExpired(entry) {
 		return false, nil
 	}
 	delete(k.storage, key)
@@ -87,7 +94,7 @@ func (k *KeyValueStore) CleanupExpired() {
 	defer k.mutex.Unlock()
 
 	for key, value := range k.storage {
-		if k.isExpired(value.createdAt) {
+		if k.isExpired(value) {
 			delete(k.storage, key)
 			removed++
 		}
@@ -108,8 +115,12 @@ func (k *KeyValueStore) CleanupExpired() {
 	)
 }
 
-func (k *KeyValueStore) isExpired(createdAt time.Time) bool {
+func (k *KeyValueStore) isExpired(entry KeyValueEntry) bool {
+	if entry.ttl <= 0 {
+		return false
+	}
+
 	t := k.clock.Now()
-	diff := t.Sub(createdAt)
-	return diff >= k.ttl
+	diff := t.Sub(entry.createdAt)
+	return diff >= entry.ttl
 }

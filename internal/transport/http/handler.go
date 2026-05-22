@@ -2,12 +2,16 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
-	"github.com/playfulCloud/cadistributedche/internal/model"
 	"github.com/playfulCloud/cadistributedche/internal/store"
 )
+
+var errInvalidTTL = errors.New("ttl must be greater than zero")
 
 type StorageHandler struct {
 	storage store.Store
@@ -19,26 +23,26 @@ func NewStorageHandler(storage store.Store) *StorageHandler {
 	}
 }
 
-func (h *StorageHandler) handleStorage(w http.ResponseWriter, r *http.Request) {
+func (h *StorageHandler) handleCache(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		h.handleGetStorage(w, r)
+		h.handleGetCache(w, r)
 	case http.MethodPut:
-		h.handlePutStorage(w, r)
+		h.handlePutCache(w, r)
 	case http.MethodDelete:
-		h.handleDeleteStorage(w, r)
+		h.handleDeleteCache(w, r)
 	default:
 		w.Header().Set("Allow", "GET, PUT, DELETE")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func (h *StorageHandler) handleGetStorage(w http.ResponseWriter, r *http.Request) {
-	key := r.URL.Query().Get("key")
+func (h *StorageHandler) handleGetCache(w http.ResponseWriter, r *http.Request) {
+	key := r.PathValue("key")
 	defer r.Body.Close()
 
 	if key == "" {
-		http.Error(w, "Missing query param: key", http.StatusBadRequest)
+		http.Error(w, "Missing path param: key", http.StatusBadRequest)
 		return
 	}
 
@@ -62,21 +66,28 @@ func (h *StorageHandler) handleGetStorage(w http.ResponseWriter, r *http.Request
 
 }
 
-func (h *StorageHandler) handlePutStorage(w http.ResponseWriter, r *http.Request) {
-	var req model.StorageKeyValueRequest
+func (h *StorageHandler) handlePutCache(w http.ResponseWriter, r *http.Request) {
+	key := r.PathValue("key")
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if key == "" {
+		http.Error(w, "Missing path param: key", http.StatusBadRequest)
+		return
+	}
+
+	ttl, err := parseTTL(r)
+	if err != nil {
+		http.Error(w, "Invalid ttl query param", http.StatusBadRequest)
+		return
+	}
+
+	value, err := io.ReadAll(r.Body)
+	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if req.Key == "" {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	_, existed, err := h.storage.Put(req.Key, req.Value)
+	_, existed, err := h.storage.Put(key, string(value), ttl)
 
 	if err != nil {
 		slog.Error("storage put failed", "operation", "put", "error", err)
@@ -96,12 +107,12 @@ func (h *StorageHandler) handlePutStorage(w http.ResponseWriter, r *http.Request
 	})
 }
 
-func (h *StorageHandler) handleDeleteStorage(w http.ResponseWriter, r *http.Request) {
-	key := r.URL.Query().Get("key")
+func (h *StorageHandler) handleDeleteCache(w http.ResponseWriter, r *http.Request) {
+	key := r.PathValue("key")
 	defer r.Body.Close()
 
 	if key == "" {
-		http.Error(w, "Missing query param: key", http.StatusBadRequest)
+		http.Error(w, "Missing path param: key", http.StatusBadRequest)
 		return
 	}
 
@@ -119,6 +130,24 @@ func (h *StorageHandler) handleDeleteStorage(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func parseTTL(r *http.Request) (time.Duration, error) {
+	rawTTL := r.URL.Query().Get("ttl")
+	if rawTTL == "" {
+		return 0, nil
+	}
+
+	ttl, err := time.ParseDuration(rawTTL)
+	if err != nil {
+		return 0, err
+	}
+
+	if ttl <= 0 {
+		return 0, errInvalidTTL
+	}
+
+	return ttl, nil
 }
 
 func writeJson(w http.ResponseWriter, status int, data any) {
