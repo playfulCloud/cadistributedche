@@ -23,10 +23,11 @@ var (
 		15, 30, 0, 0,
 		time.UTC,
 	)
+	ttl = 50 * time.Second
 )
 
 func TestConcurrentReadsWrites(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 
 	store.Put("cloud", "playful")
 	var wg sync.WaitGroup
@@ -48,7 +49,7 @@ func TestConcurrentReadsWrites(t *testing.T) {
 }
 
 func TestConcurrentWrites(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 
 	store.Put("cloud", "playful")
 	var wg sync.WaitGroup
@@ -66,7 +67,7 @@ func TestConcurrentWrites(t *testing.T) {
 }
 
 func TestConcurrentDeletes(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 	populateStore(store)
 	var wg sync.WaitGroup
 
@@ -83,7 +84,7 @@ func TestConcurrentDeletes(t *testing.T) {
 }
 
 func TestConcurrentWritesDeletes(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 	populateStore(store)
 	var wg sync.WaitGroup
 
@@ -106,7 +107,7 @@ func TestConcurrentWritesDeletes(t *testing.T) {
 }
 
 func TestConcurrentWritesDeletesFinalState(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 	populateStore(store)
 
 	var wg sync.WaitGroup
@@ -147,7 +148,7 @@ func TestConcurrentWritesDeletesFinalState(t *testing.T) {
 }
 
 func TestPutReturnsPreviousValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 
 	prev, existed, _ := store.Put("key", "first")
 	if prev != "" {
@@ -167,7 +168,7 @@ func TestPutReturnsPreviousValue(t *testing.T) {
 }
 
 func TestPutDetectsExistingEmptyValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 
 	_, existed, _ := store.Put("key", "")
 	if existed {
@@ -184,7 +185,7 @@ func TestPutDetectsExistingEmptyValue(t *testing.T) {
 }
 
 func TestDeleteReturnsFound(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 
 	store.Put("key", "value")
 
@@ -200,7 +201,7 @@ func TestDeleteReturnsFound(t *testing.T) {
 }
 
 func TestGetMissingKey(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 
 	value, exists, _ := store.Get("missing")
 	if value != "" {
@@ -212,7 +213,7 @@ func TestGetMissingKey(t *testing.T) {
 }
 
 func TestGetExistingEmptyValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock())
+	store := NewKeyValueStore(provideFakeClock(), ttl)
 
 	store.Put("key", "")
 
@@ -222,6 +223,53 @@ func TestGetExistingEmptyValue(t *testing.T) {
 	}
 	if !exists {
 		t.Fatal("expected key to exist")
+	}
+}
+
+func TestGetExpiredKeyShouldReturnNothing(t *testing.T) {
+	store := &KeyValueStore{
+		storage: storageWithExpiredEntries(),
+		clock:   provideFakeClock(),
+		ttl:     time.Duration(30) * time.Second,
+	}
+
+	value, exists, _ := store.Get("user:1")
+	if value != "" {
+		t.Fatalf("expected empty value, got %s", value)
+	}
+	if exists {
+		t.Fatal("expected key to not exist")
+	}
+}
+
+func TestPutExpiredKeyShouldReturnNothing(t *testing.T) {
+	store := &KeyValueStore{
+		storage: storageWithExpiredEntries(),
+		clock:   provideFakeClock(),
+		ttl:     time.Duration(30) * time.Second,
+	}
+
+	value, exists, _ := store.Put("user:1", "cloud")
+
+	if value != "" {
+		t.Fatalf("expected empty value, got %s", value)
+	}
+	if exists {
+		t.Fatal("expected key to not exist")
+	}
+}
+
+func TestDeleteExpiredKeyShouldReturnFalse(t *testing.T) {
+	store := &KeyValueStore{
+		storage: storageWithExpiredEntries(),
+		clock:   provideFakeClock(),
+		ttl:     time.Duration(30) * time.Second,
+	}
+
+	exists, _ := store.Delete("user:1")
+
+	if exists {
+		t.Fatal("expected key to not exist")
 	}
 }
 

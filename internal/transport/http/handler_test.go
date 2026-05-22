@@ -17,7 +17,7 @@ func TestStorageHandler(t *testing.T) {
 		httpMethod string
 		response   string
 		allow      string
-		store      fakeStore
+		store      FakeStore
 	}{
 		{
 			name:       "PUT Element in store exists",
@@ -66,7 +66,7 @@ func TestStorageHandler(t *testing.T) {
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodPut,
 			response:   "Internal Server error\n",
-			store: fakeStore{
+			store: FakeStore{
 				put: func(key string, value string) (string, bool, error) {
 					return "", false, errors.New("some error related with store")
 				},
@@ -106,7 +106,7 @@ func TestStorageHandler(t *testing.T) {
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodGet,
 			response:   "Internal Server error\n",
-			store: fakeStore{
+			store: FakeStore{
 				get: func(key string) (string, bool, error) {
 					return "", false, errors.New("some error related with store")
 				},
@@ -138,7 +138,7 @@ func TestStorageHandler(t *testing.T) {
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodDelete,
 			response:   "Internal Server error\n",
-			store: fakeStore{
+			store: FakeStore{
 				delete: func(key string) (bool, error) {
 					return false, errors.New("some error related with store")
 				},
@@ -180,13 +180,13 @@ func TestStorageHandler(t *testing.T) {
 	}
 }
 
-type fakeStore struct {
+type FakeStore struct {
 	put    func(key string, value string) (string, bool, error)
 	get    func(key string) (string, bool, error)
 	delete func(key string) (bool, error)
 }
 
-func (f *fakeStore) Get(key string) (string, bool, error) {
+func (f *FakeStore) Get(key string) (string, bool, error) {
 	if f.get != nil {
 		return f.get(key)
 	}
@@ -199,7 +199,7 @@ func (f *fakeStore) Get(key string) (string, bool, error) {
 	return "value", true, nil
 }
 
-func (f *fakeStore) Put(key string, value string) (string, bool, error) {
+func (f *FakeStore) Put(key string, value string) (string, bool, error) {
 	if f.put != nil {
 		return f.put(key, value)
 	}
@@ -215,7 +215,7 @@ func (f *fakeStore) Put(key string, value string) (string, bool, error) {
 	return "", false, nil
 }
 
-func (f *fakeStore) Delete(key string) (bool, error) {
+func (f *FakeStore) Delete(key string) (bool, error) {
 	if f.delete != nil {
 		return f.delete(key)
 	}

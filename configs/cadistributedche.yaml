@@ -1,0 +1,10 @@
+store:
+  time_to_leave: 10s
+
+server:
+  port: 8080
+  timeouts:
+    read: 5s
+    write: 10s
+    idle: 120s
+    shutdown: 5s 
