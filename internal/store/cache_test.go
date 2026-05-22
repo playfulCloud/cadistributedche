@@ -273,14 +273,14 @@ func TestDeleteExpiredKeyShouldReturnFalse(t *testing.T) {
 	}
 }
 
-func TestCleanUpExpired(t *testing.T) {
+func TestCleanupExpired(t *testing.T) {
 	store := &KeyValueStore{
 		storage: storageWithExpiredEntries(),
 		clock:   provideFakeClock(),
 		ttl:     time.Duration(30) * time.Second,
 	}
 
-	store.CleanUpExpired()
+	store.CleanupExpired()
 	storageSize := len(store.storage)
 	if storageSize != 0 {
 		t.Fatalf("Expected storage to be empty after clean but got %d elements", storageSize)

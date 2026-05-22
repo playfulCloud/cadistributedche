@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/playfulCloud/cadistributedche/internal/model"
@@ -37,14 +38,15 @@ func (h *StorageHandler) handleGetStorage(w http.ResponseWriter, r *http.Request
 	defer r.Body.Close()
 
 	if key == "" {
-		http.Error(w, "Missing querry param: key", http.StatusBadRequest)
+		http.Error(w, "Missing query param: key", http.StatusBadRequest)
 		return
 	}
 
 	value, found, err := h.storage.Get(key)
 
 	if err != nil {
-		http.Error(w, "Internal Server error", http.StatusInternalServerError)
+		slog.Error("storage get failed", "operation", "get", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -77,7 +79,8 @@ func (h *StorageHandler) handlePutStorage(w http.ResponseWriter, r *http.Request
 	_, existed, err := h.storage.Put(req.Key, req.Value)
 
 	if err != nil {
-		http.Error(w, "Internal Server error", http.StatusInternalServerError)
+		slog.Error("storage put failed", "operation", "put", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -98,14 +101,15 @@ func (h *StorageHandler) handleDeleteStorage(w http.ResponseWriter, r *http.Requ
 	defer r.Body.Close()
 
 	if key == "" {
-		http.Error(w, "Missing querry param: key", http.StatusBadRequest)
+		http.Error(w, "Missing query param: key", http.StatusBadRequest)
 		return
 	}
 
 	found, err := h.storage.Delete(key)
 
 	if err != nil {
-		http.Error(w, "Internal Server error", http.StatusInternalServerError)
+		slog.Error("storage delete failed", "operation", "delete", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 

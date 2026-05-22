@@ -65,7 +65,7 @@ func TestStorageHandler(t *testing.T) {
 			url:        "/storage",
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodPut,
-			response:   "Internal Server error\n",
+			response:   "Internal server error\n",
 			store: FakeStore{
 				put: func(key string, value string) (string, bool, error) {
 					return "", false, errors.New("some error related with store")
@@ -98,14 +98,14 @@ func TestStorageHandler(t *testing.T) {
 			url:        "/storage",
 			status:     http.StatusBadRequest,
 			httpMethod: http.MethodGet,
-			response:   "Missing querry param: key\n",
+			response:   "Missing query param: key\n",
 		},
 		{
 			name:       "GET store error",
 			url:        "/storage?key=exists",
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodGet,
-			response:   "Internal Server error\n",
+			response:   "Internal server error\n",
 			store: FakeStore{
 				get: func(key string) (string, bool, error) {
 					return "", false, errors.New("some error related with store")
@@ -130,14 +130,14 @@ func TestStorageHandler(t *testing.T) {
 			url:        "/storage",
 			status:     http.StatusBadRequest,
 			httpMethod: http.MethodDelete,
-			response:   "Missing querry param: key\n",
+			response:   "Missing query param: key\n",
 		},
 		{
 			name:       "DELETE store error",
 			url:        "/storage?key=exists",
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodDelete,
-			response:   "Internal Server error\n",
+			response:   "Internal server error\n",
 			store: FakeStore{
 				delete: func(key string) (bool, error) {
 					return false, errors.New("some error related with store")

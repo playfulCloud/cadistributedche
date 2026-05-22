@@ -1,5 +1,5 @@
 store:
-  time_to_leave: 10s
+  time_to_live: 10s
 
 server:
   port: 8080

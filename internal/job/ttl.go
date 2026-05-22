@@ -2,7 +2,7 @@ package job
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -10,12 +10,14 @@ func RunTTL(ctx context.Context, ttlExecutorFunction func(), tickDuration time.D
 	ticker := time.NewTicker(tickDuration)
 	defer ticker.Stop()
 
+	slog.Info("ttl cleanup worker started", "interval", tickDuration.String())
+
 	for {
 		select {
 		case <-ticker.C:
 			ttlExecutorFunction()
 		case <-ctx.Done():
-			log.Print("Closing the job")
+			slog.Info("ttl cleanup worker stopped", "reason", ctx.Err())
 			return
 		}
 	}

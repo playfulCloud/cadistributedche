@@ -25,16 +25,16 @@ func TestServerShouldShutDown(t *testing.T) {
 
 	err := server.Shutdown(ctx)
 	if err != nil {
-		t.Fatalf("Server should shut down without but got %v", err)
+		t.Fatalf("Server should shut down without error, but got %v", err)
 	}
 
 	select {
 	case e := <-errCh:
 		if e != nil {
-			t.Fatalf("Error channel should be empty during successfull shut down but got %v ", e)
+			t.Fatalf("Error channel should be empty during successful shutdown, but got %v", e)
 		}
 	case <-time.After(1 * time.Second):
-		t.Fatalf("Server should shoul shut down inside the time range given but it did not")
+		t.Fatalf("Server should shut down within the given time range, but it did not")
 
 	}
 }

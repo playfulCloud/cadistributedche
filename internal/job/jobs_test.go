@@ -19,7 +19,7 @@ func TestRunTTL(t *testing.T) {
 	select {
 	case <-sent:
 	case <-time.After(5 * time.Second):
-		t.Fatalf("Expected ttl to be run withing 5 second but did not")
+		t.Fatalf("Expected TTL to run within 5 seconds, but it did not")
 	}
 }
 
@@ -36,6 +36,6 @@ func TestRunTTLClosingJob(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatalf("Expected ttl to be run withing 5 second but did not")
+		t.Fatalf("Expected TTL to stop within 5 seconds, but it did not")
 	}
 }

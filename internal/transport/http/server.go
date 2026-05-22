@@ -3,7 +3,7 @@ package http
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -33,6 +33,7 @@ func NewServer(storageHandler *StorageHandler, cfg config.ServerConfig) *Server 
 }
 
 func (s *Server) Run() error {
+	slog.Info("http server starting", "addr", s.server.Addr)
 	err := s.server.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
@@ -41,6 +42,6 @@ func (s *Server) Run() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	log.Print("Shutting down server")
+	slog.Info("http server shutdown started")
 	return s.server.Shutdown(ctx)
 }

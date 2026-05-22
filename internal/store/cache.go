@@ -1,7 +1,8 @@
 package store
 
 import (
-	"log"
+	"context"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -13,7 +14,7 @@ type Store interface {
 }
 
 type ExpiringStore interface {
-	CleanUpExpired()
+	CleanupExpired()
 }
 
 type KeyValueStore struct {
@@ -78,16 +79,33 @@ func (k *KeyValueStore) Delete(key string) (bool, error) {
 	return true, nil
 }
 
-func (k *KeyValueStore) CleanUpExpired() {
-	log.Printf("Storage clean up stared")
+func (k *KeyValueStore) CleanupExpired() {
+	startedAt := time.Now()
+	removed := 0
+
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
+
 	for key, value := range k.storage {
 		if k.isExpired(value.createdAt) {
-			log.Printf("Cleaning up: %s", key)
 			delete(k.storage, key)
+			removed++
 		}
 	}
+
+	level := slog.LevelDebug
+	if removed > 0 {
+		level = slog.LevelInfo
+	}
+
+	slog.Log(
+		context.Background(),
+		level,
+		"expired entries cleanup completed",
+		"removed", removed,
+		"remaining", len(k.storage),
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+	)
 }
 
 func (k *KeyValueStore) isExpired(createdAt time.Time) bool {

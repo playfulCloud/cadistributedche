@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +15,9 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	appCtx, stop := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
@@ -25,7 +28,8 @@ func main() {
 
 	cfg, err := config.ReadConfig("configs/cadistributedche.yaml")
 	if err != nil {
-		log.Fatal("Error while reading the config file")
+		slog.Error("failed to load configuration", "path", "configs/cadistributedche.yaml", "error", err)
+		os.Exit(1)
 	}
 
 	storage := store.NewKeyValueStore(&store.ClockProvider{}, cfg.Store.Ttl)
@@ -37,16 +41,17 @@ func main() {
 		errCh <- server.Run()
 	}()
 
-	go job.RunTTL(appCtx, storage.CleanUpExpired, 5*time.Second)
+	go job.RunTTL(appCtx, storage.CleanupExpired, 5*time.Second)
 
 	select {
 	case <-appCtx.Done():
-		log.Println("Shut down signal received")
+		slog.Info("shutdown signal received")
 	case serverErr := <-errCh:
 		if serverErr != nil {
-			log.Fatalf("Server stopped unexpectedly: %v", serverErr)
+			slog.Error("http server stopped unexpectedly", "error", serverErr)
+			os.Exit(1)
 		}
-		log.Print("Server stopped")
+		slog.Info("http server stopped")
 
 	}
 
@@ -55,7 +60,9 @@ func main() {
 
 	err = server.Shutdown(shutdownCtx)
 	if err != nil {
-		log.Fatalf("Server shutdown failed %v", err)
+		slog.Error("http server shutdown failed", "error", err)
+		os.Exit(1)
 	}
 
+	slog.Info("application shutdown complete")
 }

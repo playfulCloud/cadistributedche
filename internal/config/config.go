@@ -20,5 +20,5 @@ type TimeoutConfig struct {
 }
 
 type StoreConfig struct {
-	Ttl time.Duration `yaml:"time_to_leave"`
+	Ttl time.Duration `yaml:"time_to_live"`
 }
