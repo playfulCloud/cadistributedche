@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/playfulCloud/cadistributedche/internal/metrics"
+	"github.com/playfulCloud/cadistributedche/internal/store"
 )
 
 func TestStorageHandler(t *testing.T) {
@@ -19,7 +22,7 @@ func TestStorageHandler(t *testing.T) {
 		httpMethod string
 		response   string
 		allow      string
-		store      FakeStore
+		store      store.FakeStore
 	}{
 		{
 			name:       "PUT element in store exists",
@@ -56,8 +59,8 @@ func TestStorageHandler(t *testing.T) {
 			status:     http.StatusCreated,
 			httpMethod: http.MethodPut,
 			response:   `{"status":"created"}` + "\n",
-			store: FakeStore{
-				put: func(key string, value string, ttl time.Duration) (string, bool, error) {
+			store: store.FakeStore{
+				PutFunc: func(key string, value string, ttl time.Duration) (string, bool, error) {
 					if ttl != 10*time.Second {
 						return "", false, errors.New("unexpected ttl")
 					}
@@ -90,8 +93,8 @@ func TestStorageHandler(t *testing.T) {
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodPut,
 			response:   "Internal server error\n",
-			store: FakeStore{
-				put: func(key string, value string, ttl time.Duration) (string, bool, error) {
+			store: store.FakeStore{
+				PutFunc: func(key string, value string, ttl time.Duration) (string, bool, error) {
 					return "", false, errors.New("some error related with store")
 				},
 			},
@@ -134,8 +137,8 @@ func TestStorageHandler(t *testing.T) {
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodGet,
 			response:   "Internal server error\n",
-			store: FakeStore{
-				get: func(key string) (string, bool, error) {
+			store: store.FakeStore{
+				GetFunc: func(key string) (string, bool, error) {
 					return "", false, errors.New("some error related with store")
 				},
 			},
@@ -169,8 +172,8 @@ func TestStorageHandler(t *testing.T) {
 			status:     http.StatusInternalServerError,
 			httpMethod: http.MethodDelete,
 			response:   "Internal server error\n",
-			store: FakeStore{
-				delete: func(key string) (bool, error) {
+			store: store.FakeStore{
+				DeleteFunc: func(key string) (bool, error) {
 					return false, errors.New("some error related with store")
 				},
 			},
@@ -213,47 +216,81 @@ func TestStorageHandler(t *testing.T) {
 	}
 }
 
-type FakeStore struct {
-	put    func(key string, value string, ttl time.Duration) (string, bool, error)
-	get    func(key string) (string, bool, error)
-	delete func(key string) (bool, error)
-}
+func TestHandleMetrics(t *testing.T) {
+	tests := []struct {
+		name       string
+		url        string
+		status     int
+		httpMethod string
+		response   string
+		allow      string
+		metrics    metrics.CacheMetrics
+	}{
+		{
+			name:       "GET metrics",
+			url:        "/cache/metrics",
+			status:     http.StatusOK,
+			httpMethod: http.MethodGet,
+			response:   `{"cacheHits":10,"cacheMisses":20,"cacheDeletes":30,"cacheWrites":40,"cacheTotalKeys":50}` + "\n",
+			metrics: metrics.CacheMetrics{
+				CacheHits:      10,
+				CacheMisses:    20,
+				CacheDeletes:   30,
+				CacheWrites:    40,
+				CacheTotalKeys: 50,
+			},
+		},
+		{
+			name:       "POST method not allowed",
+			url:        "/cache/metrics",
+			status:     http.StatusMethodNotAllowed,
+			httpMethod: http.MethodPost,
+			response:   "method not allowed\n",
+			allow:      "GET",
+		},
+		{
+			name:       "PUT method not allowed",
+			url:        "/cache/metrics",
+			status:     http.StatusMethodNotAllowed,
+			httpMethod: http.MethodPut,
+			response:   "method not allowed\n",
+			allow:      "GET",
+		},
+		{
+			name:       "DELETE method not allowed",
+			url:        "/cache/metrics",
+			status:     http.StatusMethodNotAllowed,
+			httpMethod: http.MethodDelete,
+			response:   "method not allowed\n",
+			allow:      "GET",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &metrics.FakeMetricsReader{
+				GetMetricsFunc: func() metrics.CacheMetrics {
+					return tt.metrics
+				},
+			}
+			h := NewMetricsHandler(f)
 
-func (f *FakeStore) Get(key string) (string, bool, error) {
-	if f.get != nil {
-		return f.get(key)
-	}
-	if key == "empty" {
-		return "", false, nil
-	}
-	if key == "empty-value" {
-		return "", true, nil
-	}
-	return "value", true, nil
-}
+			req := httptest.NewRequest(tt.httpMethod, tt.url, strings.NewReader(""))
+			rr := httptest.NewRecorder()
 
-func (f *FakeStore) Put(key string, value string, ttl time.Duration) (string, bool, error) {
-	if f.put != nil {
-		return f.put(key, value, ttl)
-	}
-	if key == "exists" {
-		return "previousValue", true, nil
-	}
-	if key == "empty-value" {
-		return "", true, nil
-	}
-	if key == "error" {
-		return "", false, errors.New("some error related with store")
-	}
-	return "", false, nil
-}
+			h.handleMetrics(rr, req)
 
-func (f *FakeStore) Delete(key string) (bool, error) {
-	if f.delete != nil {
-		return f.delete(key)
+			if rr.Code != tt.status {
+				t.Fatalf("The status code expected to be %d but got %d", tt.status, rr.Code)
+			}
+
+			if rr.Body.String() != tt.response {
+				t.Fatalf("The body expected to be %s but got %s", tt.response, rr.Body.String())
+			}
+
+			if rr.Header().Get("Allow") != tt.allow {
+				t.Fatalf("The Allow header expected to be %s but got %s", tt.allow, rr.Header().Get("Allow"))
+			}
+
+		})
 	}
-	if key == "exists" {
-		return true, nil
-	}
-	return false, nil
 }

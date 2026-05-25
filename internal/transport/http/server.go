@@ -12,16 +12,19 @@ import (
 
 type Server struct {
 	storageHandler *StorageHandler
+	metricsHandler *MetricsHandler
 	server         *http.Server
 }
 
-func NewServer(storageHandler *StorageHandler, cfg config.ServerConfig) *Server {
+func NewServer(storageHandler *StorageHandler, metricsHandler *MetricsHandler, cfg config.ServerConfig) *Server {
 	router := http.NewServeMux()
 	router.HandleFunc("/cache/{key}", storageHandler.handleCache)
+	router.HandleFunc("/cache/metrics", metricsHandler.handleMetrics)
 
 	handler := loggingMiddleware(router)
 	return &Server{
 		storageHandler: storageHandler,
+		metricsHandler: metricsHandler,
 		server: &http.Server{
 			Addr:         ":" + strconv.Itoa(cfg.Port),
 			Handler:      handler,

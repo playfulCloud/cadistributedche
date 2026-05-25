@@ -6,11 +6,14 @@ import (
 	"time"
 
 	"github.com/playfulCloud/cadistributedche/internal/config"
+	"github.com/playfulCloud/cadistributedche/internal/metrics"
+	"github.com/playfulCloud/cadistributedche/internal/store"
 )
 
 func TestServerShouldShutDown(t *testing.T) {
-	storageHandler := NewStorageHandler(&FakeStore{})
-	server := NewServer(storageHandler, testServerConfig())
+	storageHandler := NewStorageHandler(&store.FakeStore{})
+	metricsHandler := NewMetricsHandler(&metrics.FakeMetricsReader{})
+	server := NewServer(storageHandler, metricsHandler, testServerConfig())
 
 	errCh := make(chan error, 1)
 

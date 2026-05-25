@@ -54,4 +54,8 @@ sleep 3
 request GET "/cache/$TTL_KEY" "" "404"
 request PUT "/cache/$CACHE_KEY?ttl=invalid" "bad-ttl" "400"
 
+
+printf "\n Metrics: \n"
+request GET "/cache/metrics" "" "200"
+
 printf "\nManual cache API checks completed successfully.\n"

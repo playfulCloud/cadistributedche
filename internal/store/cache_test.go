@@ -5,6 +5,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/playfulCloud/cadistributedche/internal/metrics"
 )
 
 var (
@@ -27,7 +29,7 @@ var (
 )
 
 func TestConcurrentReadsWrites(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 
 	store.Put("cloud", "playful", 0)
 	var wg sync.WaitGroup
@@ -49,7 +51,7 @@ func TestConcurrentReadsWrites(t *testing.T) {
 }
 
 func TestConcurrentWrites(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 
 	store.Put("cloud", "playful", 0)
 	var wg sync.WaitGroup
@@ -67,7 +69,7 @@ func TestConcurrentWrites(t *testing.T) {
 }
 
 func TestConcurrentDeletes(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 	populateStore(store)
 	var wg sync.WaitGroup
 
@@ -84,7 +86,7 @@ func TestConcurrentDeletes(t *testing.T) {
 }
 
 func TestConcurrentWritesDeletes(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 	populateStore(store)
 	var wg sync.WaitGroup
 
@@ -107,7 +109,7 @@ func TestConcurrentWritesDeletes(t *testing.T) {
 }
 
 func TestConcurrentWritesDeletesFinalState(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 	populateStore(store)
 
 	var wg sync.WaitGroup
@@ -148,7 +150,7 @@ func TestConcurrentWritesDeletesFinalState(t *testing.T) {
 }
 
 func TestPutReturnsPreviousValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 
 	prev, existed, _ := store.Put("key", "first", 0)
 	if prev != "" {
@@ -168,7 +170,7 @@ func TestPutReturnsPreviousValue(t *testing.T) {
 }
 
 func TestPutDetectsExistingEmptyValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 
 	_, existed, _ := store.Put("key", "", 0)
 	if existed {
@@ -185,7 +187,7 @@ func TestPutDetectsExistingEmptyValue(t *testing.T) {
 }
 
 func TestDeleteReturnsFound(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 
 	store.Put("key", "value", 0)
 
@@ -201,7 +203,7 @@ func TestDeleteReturnsFound(t *testing.T) {
 }
 
 func TestGetMissingKey(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 
 	value, exists, _ := store.Get("missing")
 	if value != "" {
@@ -213,7 +215,7 @@ func TestGetMissingKey(t *testing.T) {
 }
 
 func TestGetExistingEmptyValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), ttl)
+	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
 
 	store.Put("key", "", 0)
 
@@ -230,6 +232,7 @@ func TestGetExpiredKeyShouldReturnNothing(t *testing.T) {
 	store := &KeyValueStore{
 		storage: storageWithExpiredEntries(),
 		clock:   provideFakeClock(),
+		metrics: &metrics.MetricsCollector{},
 		ttl:     time.Duration(30) * time.Second,
 	}
 
@@ -246,7 +249,7 @@ func TestPutWithCustomTTLOverridesDefaultTTL(t *testing.T) {
 	clock := &FakeClock{
 		FixedTime: newerDate,
 	}
-	store := NewKeyValueStore(clock, time.Hour)
+	store := NewKeyValueStore(clock, &metrics.MetricsCollector{}, time.Hour)
 
 	store.Put("key", "value", time.Second)
 
@@ -265,6 +268,7 @@ func TestPutExpiredKeyShouldReturnNothing(t *testing.T) {
 	store := &KeyValueStore{
 		storage: storageWithExpiredEntries(),
 		clock:   provideFakeClock(),
+		metrics: &metrics.MetricsCollector{},
 		ttl:     time.Duration(30) * time.Second,
 	}
 
@@ -282,6 +286,7 @@ func TestDeleteExpiredKeyShouldReturnFalse(t *testing.T) {
 	store := &KeyValueStore{
 		storage: storageWithExpiredEntries(),
 		clock:   provideFakeClock(),
+		metrics: &metrics.MetricsCollector{},
 		ttl:     time.Duration(30) * time.Second,
 	}
 
@@ -296,6 +301,7 @@ func TestCleanupExpired(t *testing.T) {
 	store := &KeyValueStore{
 		storage: storageWithExpiredEntries(),
 		clock:   provideFakeClock(),
+		metrics: &metrics.MetricsCollector{},
 		ttl:     time.Duration(30) * time.Second,
 	}
 

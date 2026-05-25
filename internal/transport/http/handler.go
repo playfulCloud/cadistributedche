@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/playfulCloud/cadistributedche/internal/metrics"
 	"github.com/playfulCloud/cadistributedche/internal/store"
 )
 
@@ -17,9 +18,19 @@ type StorageHandler struct {
 	storage store.Store
 }
 
+type MetricsHandler struct {
+	reader metrics.CacheMetricsReader
+}
+
 func NewStorageHandler(storage store.Store) *StorageHandler {
 	return &StorageHandler{
 		storage: storage,
+	}
+}
+
+func NewMetricsHandler(reader metrics.CacheMetricsReader) *MetricsHandler {
+	return &MetricsHandler{
+		reader: reader,
 	}
 }
 
@@ -33,6 +44,18 @@ func (h *StorageHandler) handleCache(w http.ResponseWriter, r *http.Request) {
 		h.handleDeleteCache(w, r)
 	default:
 		w.Header().Set("Allow", "GET, PUT, DELETE")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *MetricsHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	switch r.Method {
+	case http.MethodGet:
+		metrics := h.reader.GetMetrics()
+		writeJson(w, http.StatusOK, metrics)
+	default:
+		w.Header().Set("Allow", "GET")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }

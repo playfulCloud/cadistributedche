@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/playfulCloud/cadistributedche/internal/metrics"
 )
 
 type Store interface {
@@ -21,6 +23,7 @@ type KeyValueStore struct {
 	storage map[string]KeyValueEntry
 	mutex   sync.RWMutex
 	clock   Clock
+	metrics metrics.CacheMetricsCollector
 	ttl     time.Duration
 }
 
@@ -31,11 +34,12 @@ type KeyValueEntry struct {
 	ttl       time.Duration
 }
 
-func NewKeyValueStore(clock Clock, ttl time.Duration) *KeyValueStore {
+func NewKeyValueStore(clock Clock, metrics metrics.CacheMetricsCollector, ttl time.Duration) *KeyValueStore {
 	return &KeyValueStore{
 		storage: make(map[string]KeyValueEntry),
 		clock:   clock,
 		ttl:     ttl,
+		metrics: metrics,
 	}
 }
 
@@ -55,9 +59,13 @@ func (k *KeyValueStore) Put(key string, value string, ttl time.Duration) (string
 		createdAt: k.clock.Now(),
 		ttl:       entryTtl,
 	}
+	k.metrics.IncreaseCacheWrites()
+	k.metrics.SetCacheTotalKeys(uint64(len(k.storage)))
+
 	if !exists || k.isExpired(previousEntry) {
 		return "", false, nil
 	}
+
 	return previousEntry.value, true, nil
 
 }
@@ -68,8 +76,10 @@ func (k *KeyValueStore) Get(key string) (string, bool, error) {
 
 	entry, exists := k.storage[key]
 	if !exists || k.isExpired(entry) {
+		k.metrics.IncreaseCacheMisses()
 		return "", false, nil
 	}
+	k.metrics.IncreaseCacheHits()
 
 	return entry.value, exists, nil
 
@@ -80,9 +90,15 @@ func (k *KeyValueStore) Delete(key string) (bool, error) {
 	defer k.mutex.Unlock()
 	entry, exists := k.storage[key]
 	if !exists || k.isExpired(entry) {
+		k.metrics.IncreaseCacheMisses()
 		return false, nil
 	}
+
 	delete(k.storage, key)
+
+	k.metrics.IncreaseCacheDeletes()
+	k.metrics.SetCacheTotalKeys(uint64(len(k.storage)))
+
 	return true, nil
 }
 
@@ -105,6 +121,7 @@ func (k *KeyValueStore) CleanupExpired() {
 		level = slog.LevelInfo
 	}
 
+	k.metrics.SetCacheTotalKeys(uint64(len(k.storage)))
 	slog.Log(
 		context.Background(),
 		level,

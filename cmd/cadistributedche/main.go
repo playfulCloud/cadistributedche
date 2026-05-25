@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/playfulCloud/cadistributedche/internal/config"
-	"github.com/playfulCloud/cadistributedche/internal/job"
+	"github.com/playfulCloud/cadistributedche/internal/jobs"
+	"github.com/playfulCloud/cadistributedche/internal/metrics"
 	"github.com/playfulCloud/cadistributedche/internal/store"
 	"github.com/playfulCloud/cadistributedche/internal/transport/http"
 )
@@ -32,16 +33,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	storage := store.NewKeyValueStore(&store.ClockProvider{}, cfg.Store.Ttl)
+	metricsCollector := &metrics.MetricsCollector{}
+	storage := store.NewKeyValueStore(&store.ClockProvider{}, metricsCollector, cfg.Store.Ttl)
 	storageHandler := http.NewStorageHandler(storage)
-	server := http.NewServer(storageHandler, cfg.Server)
+	metricsHandler := http.NewMetricsHandler(metricsCollector)
+	server := http.NewServer(storageHandler, metricsHandler, cfg.Server)
 	errCh := make(chan error, 1)
 
 	go func() {
 		errCh <- server.Run()
 	}()
 
-	go job.RunTTL(appCtx, storage.CleanupExpired, 5*time.Second)
+	go jobs.RunTTL(appCtx, storage.CleanupExpired, 5*time.Second)
 
 	select {
 	case <-appCtx.Done():
