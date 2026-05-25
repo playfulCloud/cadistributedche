@@ -15,6 +15,9 @@ test:
 race:
 	go test -race ./...
 
+bench:
+	go test -run '^$$' -bench . -benchmem ./...
+
 test-v:
 	go test -v ./...
 
@@ -38,4 +41,4 @@ clean:
 
 check: fmt vet test
 
-.PHONY: run build test test-v coverage fmt vet tidy clean check
+.PHONY: run build test race bench test-v coverage lint fmt vet tidy clean check

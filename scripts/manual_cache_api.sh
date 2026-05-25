@@ -56,6 +56,6 @@ request PUT "/cache/$CACHE_KEY?ttl=invalid" "bad-ttl" "400"
 
 
 printf "\n Metrics: \n"
-request GET "/cache/metrics" "" "200"
+request GET "/stats" "" "200"
 
 printf "\nManual cache API checks completed successfully.\n"

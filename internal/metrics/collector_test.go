@@ -15,17 +15,17 @@ func TestConcurrentMetricIncrement(t *testing.T) {
 		i := i
 		go func(i int) {
 			defer wg.Done()
-			m.IncreaseCacheWrites()
+			m.IncreaseWrites()
 		}(i)
 
 		go func() {
 			defer wg.Done()
-			m.IncreaseCacheWrites()
+			m.IncreaseWrites()
 		}()
 	}
 	wg.Wait()
 
-	if m.cacheWrites.Load() != 200 {
-		t.Fatalf("Concurrent metric increments should be equal to 200 but got %d", m.cacheWrites.Load())
+	if m.writes.Load() != 200 {
+		t.Fatalf("Concurrent metric increments should be equal to 200 but got %d", m.writes.Load())
 	}
 }

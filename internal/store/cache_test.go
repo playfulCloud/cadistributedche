@@ -150,7 +150,8 @@ func TestConcurrentWritesDeletesFinalState(t *testing.T) {
 }
 
 func TestPutReturnsPreviousValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
+	metrics := &metrics.FakeMetricsCollector{}
+	store := NewKeyValueStore(provideFakeClock(), metrics, ttl)
 
 	prev, existed, _ := store.Put("key", "first", 0)
 	if prev != "" {
@@ -167,10 +168,21 @@ func TestPutReturnsPreviousValue(t *testing.T) {
 	if !existed {
 		t.Fatal("expected key to exist")
 	}
+
+	writes := metrics.Writes
+	totalKeys := metrics.Keys
+
+	if writes != 2 {
+		t.Fatalf("expected cache writes to be 2, got %d", writes)
+	}
+	if totalKeys != 1 {
+		t.Fatalf("expected total keys be 0, got %d", totalKeys)
+	}
 }
 
 func TestPutDetectsExistingEmptyValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
+	metrics := &metrics.FakeMetricsCollector{}
+	store := NewKeyValueStore(provideFakeClock(), metrics, ttl)
 
 	_, existed, _ := store.Put("key", "", 0)
 	if existed {
@@ -184,10 +196,20 @@ func TestPutDetectsExistingEmptyValue(t *testing.T) {
 	if !existed {
 		t.Fatal("expected key to exist")
 	}
+	writes := metrics.Writes
+	totalKeys := metrics.Keys
+
+	if writes != 2 {
+		t.Fatalf("expected cache writes to be 2, got %d", writes)
+	}
+	if totalKeys != 1 {
+		t.Fatalf("expected total keys be 0, got %d", totalKeys)
+	}
 }
 
 func TestDeleteReturnsFound(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
+	metrics := &metrics.FakeMetricsCollector{}
+	store := NewKeyValueStore(provideFakeClock(), metrics, ttl)
 
 	store.Put("key", "value", 0)
 
@@ -200,10 +222,20 @@ func TestDeleteReturnsFound(t *testing.T) {
 	if exists {
 		t.Fatal("expected key to be deleted")
 	}
+	deletes := metrics.Deletes
+	totalKeys := metrics.Keys
+
+	if deletes != 1 {
+		t.Fatalf("expected cache writes to be 1, got %d", deletes)
+	}
+	if totalKeys != 0 {
+		t.Fatalf("expected total keys to be 1, got %d", totalKeys)
+	}
 }
 
 func TestGetMissingKey(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
+	metrics := &metrics.FakeMetricsCollector{}
+	store := NewKeyValueStore(provideFakeClock(), metrics, ttl)
 
 	value, exists, _ := store.Get("missing")
 	if value != "" {
@@ -212,10 +244,16 @@ func TestGetMissingKey(t *testing.T) {
 	if exists {
 		t.Fatal("expected key to be missing")
 	}
+
+	misses := metrics.Misses
+	if misses != 1 {
+		t.Fatalf("expected cache misses to be 1, got %d", misses)
+	}
 }
 
 func TestGetExistingEmptyValue(t *testing.T) {
-	store := NewKeyValueStore(provideFakeClock(), &metrics.MetricsCollector{}, ttl)
+	metrics := &metrics.FakeMetricsCollector{}
+	store := NewKeyValueStore(provideFakeClock(), metrics, ttl)
 
 	store.Put("key", "", 0)
 
@@ -226,13 +264,19 @@ func TestGetExistingEmptyValue(t *testing.T) {
 	if !exists {
 		t.Fatal("expected key to exist")
 	}
+
+	hits := metrics.Hits
+	if hits != 1 {
+		t.Fatalf("expected cache hits to be 1, got %d", hits)
+	}
 }
 
 func TestGetExpiredKeyShouldReturnNothing(t *testing.T) {
+	metrics := &metrics.FakeMetricsCollector{}
 	store := &KeyValueStore{
 		storage: storageWithExpiredEntries(),
 		clock:   provideFakeClock(),
-		metrics: &metrics.MetricsCollector{},
+		metrics: metrics,
 		ttl:     time.Duration(30) * time.Second,
 	}
 
@@ -243,13 +287,19 @@ func TestGetExpiredKeyShouldReturnNothing(t *testing.T) {
 	if exists {
 		t.Fatal("expected key to not exist")
 	}
+
+	misses := metrics.Misses
+	if misses != 1 {
+		t.Fatalf("expected cache misses to be 1, got %d", misses)
+	}
 }
 
 func TestPutWithCustomTTLOverridesDefaultTTL(t *testing.T) {
 	clock := &FakeClock{
 		FixedTime: newerDate,
 	}
-	store := NewKeyValueStore(clock, &metrics.MetricsCollector{}, time.Hour)
+	metrics := &metrics.FakeMetricsCollector{}
+	store := NewKeyValueStore(clock, metrics, time.Hour)
 
 	store.Put("key", "value", time.Second)
 
@@ -262,13 +312,24 @@ func TestPutWithCustomTTLOverridesDefaultTTL(t *testing.T) {
 	if exists {
 		t.Fatal("expected key to be expired")
 	}
+
+	writes := metrics.Writes
+	totalKeys := metrics.Keys
+
+	if writes != 1 {
+		t.Fatalf("expected cache writes to be 1, got %d", writes)
+	}
+	if totalKeys != 1 {
+		t.Fatalf("expected total keys be 0, got %d", totalKeys)
+	}
 }
 
 func TestPutExpiredKeyShouldReturnNothing(t *testing.T) {
+	metrics := &metrics.FakeMetricsCollector{}
 	store := &KeyValueStore{
 		storage: storageWithExpiredEntries(),
 		clock:   provideFakeClock(),
-		metrics: &metrics.MetricsCollector{},
+		metrics: metrics,
 		ttl:     time.Duration(30) * time.Second,
 	}
 
@@ -279,6 +340,16 @@ func TestPutExpiredKeyShouldReturnNothing(t *testing.T) {
 	}
 	if exists {
 		t.Fatal("expected key to not exist")
+	}
+
+	writes := metrics.Writes
+	totalKeys := metrics.Keys
+
+	if writes != 1 {
+		t.Fatalf("expected cache writes to be 1, got %d", writes)
+	}
+	if totalKeys != 3 {
+		t.Fatalf("expected total keys be 3, got %d", totalKeys)
 	}
 }
 
@@ -298,17 +369,69 @@ func TestDeleteExpiredKeyShouldReturnFalse(t *testing.T) {
 }
 
 func TestCleanupExpired(t *testing.T) {
+	metrics := &metrics.FakeMetricsCollector{}
 	store := &KeyValueStore{
 		storage: storageWithExpiredEntries(),
 		clock:   provideFakeClock(),
-		metrics: &metrics.MetricsCollector{},
+		metrics: metrics,
 		ttl:     time.Duration(30) * time.Second,
 	}
 
 	store.CleanupExpired()
 	storageSize := len(store.storage)
 	if storageSize != 0 {
-		t.Fatalf("Expected storage to be empty after clean but got %d elements", storageSize)
+		t.Fatalf("expected storage to be empty after clean but got %d elements", storageSize)
+	}
+
+	expired := metrics.Expired
+	if expired != 3 {
+		t.Fatalf("expected expired keys to be 3, but got %d", expired)
+	}
+}
+
+func BenchmarkGet(b *testing.B) {
+	metrics := &metrics.FakeMetricsCollector{}
+	store := &KeyValueStore{
+		storage: storageWithExpiredEntries(),
+		clock:   provideFakeClock(),
+		metrics: metrics,
+		ttl:     time.Duration(30) * time.Second,
+	}
+
+	store.Put("playful", "cloud", 0)
+
+	for b.Loop() {
+		store.Get("playful")
+	}
+
+}
+
+func BenchmarkPutOverrides(b *testing.B) {
+	metrics := &metrics.FakeMetricsCollector{}
+	store := &KeyValueStore{
+		storage: storageWithExpiredEntries(),
+		clock:   provideFakeClock(),
+		metrics: metrics,
+		ttl:     time.Duration(30) * time.Second,
+	}
+	b.ResetTimer()
+
+	for b.Loop() {
+		store.Put("playful", "cloud", 0)
+	}
+}
+
+func BenchmarkPut(b *testing.B) {
+	metrics := &metrics.FakeMetricsCollector{}
+	store := &KeyValueStore{
+		storage: storageWithExpiredEntries(),
+		clock:   provideFakeClock(),
+		metrics: metrics,
+		ttl:     time.Duration(30) * time.Second,
+	}
+
+	for i := 0; b.Loop(); i++ {
+		store.Put(strconv.Itoa(i), "cloud", 0)
 	}
 }
 

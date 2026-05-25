@@ -18,8 +18,8 @@ type StorageHandler struct {
 	storage store.Store
 }
 
-type MetricsHandler struct {
-	reader metrics.CacheMetricsReader
+type StatsHandler struct {
+	reader metrics.CacheStatsReader
 }
 
 func NewStorageHandler(storage store.Store) *StorageHandler {
@@ -28,8 +28,8 @@ func NewStorageHandler(storage store.Store) *StorageHandler {
 	}
 }
 
-func NewMetricsHandler(reader metrics.CacheMetricsReader) *MetricsHandler {
-	return &MetricsHandler{
+func NewStatsHandler(reader metrics.CacheStatsReader) *StatsHandler {
+	return &StatsHandler{
 		reader: reader,
 	}
 }
@@ -48,12 +48,12 @@ func (h *StorageHandler) handleCache(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *MetricsHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *StatsHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	switch r.Method {
 	case http.MethodGet:
-		metrics := h.reader.GetMetrics()
-		writeJson(w, http.StatusOK, metrics)
+		stats := h.reader.GetStats()
+		writeJson(w, http.StatusOK, stats)
 	default:
 		w.Header().Set("Allow", "GET")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

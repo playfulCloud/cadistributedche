@@ -23,7 +23,7 @@ type KeyValueStore struct {
 	storage map[string]KeyValueEntry
 	mutex   sync.RWMutex
 	clock   Clock
-	metrics metrics.CacheMetricsCollector
+	metrics metrics.CacheStatsCollector
 	ttl     time.Duration
 }
 
@@ -34,7 +34,7 @@ type KeyValueEntry struct {
 	ttl       time.Duration
 }
 
-func NewKeyValueStore(clock Clock, metrics metrics.CacheMetricsCollector, ttl time.Duration) *KeyValueStore {
+func NewKeyValueStore(clock Clock, metrics metrics.CacheStatsCollector, ttl time.Duration) *KeyValueStore {
 	return &KeyValueStore{
 		storage: make(map[string]KeyValueEntry),
 		clock:   clock,
@@ -59,8 +59,8 @@ func (k *KeyValueStore) Put(key string, value string, ttl time.Duration) (string
 		createdAt: k.clock.Now(),
 		ttl:       entryTtl,
 	}
-	k.metrics.IncreaseCacheWrites()
-	k.metrics.SetCacheTotalKeys(uint64(len(k.storage)))
+	k.metrics.IncreaseWrites()
+	k.metrics.SetKeys(uint64(len(k.storage)))
 
 	if !exists || k.isExpired(previousEntry) {
 		return "", false, nil
@@ -76,10 +76,10 @@ func (k *KeyValueStore) Get(key string) (string, bool, error) {
 
 	entry, exists := k.storage[key]
 	if !exists || k.isExpired(entry) {
-		k.metrics.IncreaseCacheMisses()
+		k.metrics.IncreaseMisses()
 		return "", false, nil
 	}
-	k.metrics.IncreaseCacheHits()
+	k.metrics.IncreaseHits()
 
 	return entry.value, exists, nil
 
@@ -90,14 +90,14 @@ func (k *KeyValueStore) Delete(key string) (bool, error) {
 	defer k.mutex.Unlock()
 	entry, exists := k.storage[key]
 	if !exists || k.isExpired(entry) {
-		k.metrics.IncreaseCacheMisses()
+		k.metrics.IncreaseMisses()
 		return false, nil
 	}
 
 	delete(k.storage, key)
 
-	k.metrics.IncreaseCacheDeletes()
-	k.metrics.SetCacheTotalKeys(uint64(len(k.storage)))
+	k.metrics.IncreaseDeletes()
+	k.metrics.SetKeys(uint64(len(k.storage)))
 
 	return true, nil
 }
@@ -111,6 +111,7 @@ func (k *KeyValueStore) CleanupExpired() {
 
 	for key, value := range k.storage {
 		if k.isExpired(value) {
+			k.metrics.IncreaseExpired()
 			delete(k.storage, key)
 			removed++
 		}
@@ -121,7 +122,7 @@ func (k *KeyValueStore) CleanupExpired() {
 		level = slog.LevelInfo
 	}
 
-	k.metrics.SetCacheTotalKeys(uint64(len(k.storage)))
+	k.metrics.SetKeys(uint64(len(k.storage)))
 	slog.Log(
 		context.Background(),
 		level,

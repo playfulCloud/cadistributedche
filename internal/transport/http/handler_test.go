@@ -216,7 +216,7 @@ func TestStorageHandler(t *testing.T) {
 	}
 }
 
-func TestHandleMetrics(t *testing.T) {
+func TestHandleStats(t *testing.T) {
 	tests := []struct {
 		name       string
 		url        string
@@ -224,25 +224,26 @@ func TestHandleMetrics(t *testing.T) {
 		httpMethod string
 		response   string
 		allow      string
-		metrics    metrics.CacheMetrics
+		stats      metrics.CacheStats
 	}{
 		{
-			name:       "GET metrics",
-			url:        "/cache/metrics",
+			name:       "GET stats",
+			url:        "/stats",
 			status:     http.StatusOK,
 			httpMethod: http.MethodGet,
-			response:   `{"cacheHits":10,"cacheMisses":20,"cacheDeletes":30,"cacheWrites":40,"cacheTotalKeys":50}` + "\n",
-			metrics: metrics.CacheMetrics{
-				CacheHits:      10,
-				CacheMisses:    20,
-				CacheDeletes:   30,
-				CacheWrites:    40,
-				CacheTotalKeys: 50,
+			response:   `{"keys":50,"hits":10,"misses":20,"expired":60,"deletes":30,"writes":40}` + "\n",
+			stats: metrics.CacheStats{
+				Keys:    50,
+				Hits:    10,
+				Misses:  20,
+				Expired: 60,
+				Deletes: 30,
+				Writes:  40,
 			},
 		},
 		{
 			name:       "POST method not allowed",
-			url:        "/cache/metrics",
+			url:        "/stats",
 			status:     http.StatusMethodNotAllowed,
 			httpMethod: http.MethodPost,
 			response:   "method not allowed\n",
@@ -250,7 +251,7 @@ func TestHandleMetrics(t *testing.T) {
 		},
 		{
 			name:       "PUT method not allowed",
-			url:        "/cache/metrics",
+			url:        "/stats",
 			status:     http.StatusMethodNotAllowed,
 			httpMethod: http.MethodPut,
 			response:   "method not allowed\n",
@@ -258,7 +259,7 @@ func TestHandleMetrics(t *testing.T) {
 		},
 		{
 			name:       "DELETE method not allowed",
-			url:        "/cache/metrics",
+			url:        "/stats",
 			status:     http.StatusMethodNotAllowed,
 			httpMethod: http.MethodDelete,
 			response:   "method not allowed\n",
@@ -268,16 +269,16 @@ func TestHandleMetrics(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &metrics.FakeMetricsReader{
-				GetMetricsFunc: func() metrics.CacheMetrics {
-					return tt.metrics
+				GetStatsFunc: func() metrics.CacheStats {
+					return tt.stats
 				},
 			}
-			h := NewMetricsHandler(f)
+			h := NewStatsHandler(f)
 
 			req := httptest.NewRequest(tt.httpMethod, tt.url, strings.NewReader(""))
 			rr := httptest.NewRecorder()
 
-			h.handleMetrics(rr, req)
+			h.handleStats(rr, req)
 
 			if rr.Code != tt.status {
 				t.Fatalf("The status code expected to be %d but got %d", tt.status, rr.Code)

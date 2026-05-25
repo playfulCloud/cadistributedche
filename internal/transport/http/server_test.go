@@ -12,8 +12,8 @@ import (
 
 func TestServerShouldShutDown(t *testing.T) {
 	storageHandler := NewStorageHandler(&store.FakeStore{})
-	metricsHandler := NewMetricsHandler(&metrics.FakeMetricsReader{})
-	server := NewServer(storageHandler, metricsHandler, testServerConfig())
+	statsHandler := NewStatsHandler(&metrics.FakeMetricsReader{})
+	server := NewServer(storageHandler, statsHandler, testServerConfig())
 
 	errCh := make(chan error, 1)
 

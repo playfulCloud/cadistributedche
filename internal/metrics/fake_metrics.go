@@ -1,19 +1,53 @@
 package metrics
 
 type FakeMetricsReader struct {
-	GetMetricsFunc func() CacheMetrics
+	GetStatsFunc func() CacheStats
 }
 
-func (f *FakeMetricsReader) GetMetrics() CacheMetrics {
-	if f.GetMetricsFunc != nil {
-		return f.GetMetricsFunc()
+func (f *FakeMetricsReader) GetStats() CacheStats {
+	if f.GetStatsFunc != nil {
+		return f.GetStatsFunc()
 	}
 
-	return CacheMetrics{
-		CacheHits:      1,
-		CacheMisses:    2,
-		CacheDeletes:   3,
-		CacheWrites:    4,
-		CacheTotalKeys: 5,
+	return CacheStats{
+		Keys:    5,
+		Hits:    1,
+		Misses:  2,
+		Expired: 6,
+		Deletes: 3,
+		Writes:  4,
 	}
+}
+
+type FakeMetricsCollector struct {
+	Hits    int
+	Misses  int
+	Deletes int
+	Writes  int
+	Keys    uint64
+	Expired int
+}
+
+func (f *FakeMetricsCollector) IncreaseHits() {
+	f.Hits++
+}
+
+func (f *FakeMetricsCollector) IncreaseMisses() {
+	f.Misses++
+}
+
+func (f *FakeMetricsCollector) IncreaseDeletes() {
+	f.Deletes++
+}
+
+func (f *FakeMetricsCollector) IncreaseWrites() {
+	f.Writes++
+}
+
+func (f *FakeMetricsCollector) SetKeys(keys uint64) {
+	f.Keys = keys
+}
+
+func (f *FakeMetricsCollector) IncreaseExpired() {
+	f.Expired++
 }

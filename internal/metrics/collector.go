@@ -3,59 +3,67 @@ package metrics
 import "sync/atomic"
 
 type MetricsCollector struct {
-	cacheHits      atomic.Uint64
-	cacheMisses    atomic.Uint64
-	cacheDeletes   atomic.Uint64
-	cacheWrites    atomic.Uint64
-	cacheTotalKeys atomic.Uint64
+	hits    atomic.Uint64
+	misses  atomic.Uint64
+	deletes atomic.Uint64
+	writes  atomic.Uint64
+	keys    atomic.Uint64
+	expired atomic.Uint64
 }
 
-type CacheMetrics struct {
-	CacheHits      uint64 `json:"cacheHits"`
-	CacheMisses    uint64 `json:"cacheMisses"`
-	CacheDeletes   uint64 `json:"cacheDeletes"`
-	CacheWrites    uint64 `json:"cacheWrites"`
-	CacheTotalKeys uint64 `json:"cacheTotalKeys"`
+type CacheStats struct {
+	Keys    uint64 `json:"keys"`
+	Hits    uint64 `json:"hits"`
+	Misses  uint64 `json:"misses"`
+	Expired uint64 `json:"expired"`
+	Deletes uint64 `json:"deletes"`
+	Writes  uint64 `json:"writes"`
 }
 
-type CacheMetricsCollector interface {
-	IncreaseCacheHits()
-	IncreaseCacheMisses()
-	IncreaseCacheDeletes()
-	IncreaseCacheWrites()
-	SetCacheTotalKeys(totalKeys uint64)
+type CacheStatsCollector interface {
+	IncreaseHits()
+	IncreaseMisses()
+	IncreaseDeletes()
+	IncreaseWrites()
+	SetKeys(keys uint64)
+	IncreaseExpired()
 }
 
-type CacheMetricsReader interface {
-	GetMetrics() CacheMetrics
+type CacheStatsReader interface {
+	GetStats() CacheStats
 }
 
-func (m *MetricsCollector) IncreaseCacheHits() {
-	m.cacheHits.Add(1)
+func (m *MetricsCollector) IncreaseHits() {
+	m.hits.Add(1)
 }
 
-func (m *MetricsCollector) IncreaseCacheMisses() {
-	m.cacheMisses.Add(1)
+func (m *MetricsCollector) IncreaseMisses() {
+	m.misses.Add(1)
 }
 
-func (m *MetricsCollector) IncreaseCacheDeletes() {
-	m.cacheDeletes.Add(1)
+func (m *MetricsCollector) IncreaseDeletes() {
+	m.deletes.Add(1)
 }
 
-func (m *MetricsCollector) IncreaseCacheWrites() {
-	m.cacheWrites.Add(1)
+func (m *MetricsCollector) IncreaseWrites() {
+	m.writes.Add(1)
 }
 
-func (m *MetricsCollector) SetCacheTotalKeys(totalKeys uint64) {
-	m.cacheTotalKeys.Store(totalKeys)
+func (m *MetricsCollector) SetKeys(keys uint64) {
+	m.keys.Store(keys)
 }
 
-func (m *MetricsCollector) GetMetrics() CacheMetrics {
-	return CacheMetrics{
-		CacheHits:      m.cacheHits.Load(),
-		CacheMisses:    m.cacheMisses.Load(),
-		CacheDeletes:   m.cacheDeletes.Load(),
-		CacheWrites:    m.cacheWrites.Load(),
-		CacheTotalKeys: m.cacheTotalKeys.Load(),
+func (m *MetricsCollector) IncreaseExpired() {
+	m.expired.Add(1)
+}
+
+func (m *MetricsCollector) GetStats() CacheStats {
+	return CacheStats{
+		Keys:    m.keys.Load(),
+		Hits:    m.hits.Load(),
+		Misses:  m.misses.Load(),
+		Expired: m.expired.Load(),
+		Deletes: m.deletes.Load(),
+		Writes:  m.writes.Load(),
 	}
 }

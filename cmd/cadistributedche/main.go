@@ -36,8 +36,8 @@ func main() {
 	metricsCollector := &metrics.MetricsCollector{}
 	storage := store.NewKeyValueStore(&store.ClockProvider{}, metricsCollector, cfg.Store.Ttl)
 	storageHandler := http.NewStorageHandler(storage)
-	metricsHandler := http.NewMetricsHandler(metricsCollector)
-	server := http.NewServer(storageHandler, metricsHandler, cfg.Server)
+	statsHandler := http.NewStatsHandler(metricsCollector)
+	server := http.NewServer(storageHandler, statsHandler, cfg.Server)
 	errCh := make(chan error, 1)
 
 	go func() {
