@@ -60,11 +60,11 @@ func TestStorageHandler(t *testing.T) {
 			httpMethod: http.MethodPut,
 			response:   `{"status":"created"}` + "\n",
 			store: store.FakeStore{
-				PutFunc: func(key string, value string, ttl time.Duration) (string, bool, error) {
+				PutFunc: func(key string, value string, ttl time.Duration) (store.KeyValueEntry, bool, error) {
 					if ttl != 10*time.Second {
-						return "", false, errors.New("unexpected ttl")
+						return store.KeyValueEntry{}, false, errors.New("unexpected ttl")
 					}
-					return "", false, nil
+					return store.KeyValueEntry{}, false, nil
 				},
 			},
 		},
@@ -94,8 +94,8 @@ func TestStorageHandler(t *testing.T) {
 			httpMethod: http.MethodPut,
 			response:   "Internal server error\n",
 			store: store.FakeStore{
-				PutFunc: func(key string, value string, ttl time.Duration) (string, bool, error) {
-					return "", false, errors.New("some error related with store")
+				PutFunc: func(key string, value string, ttl time.Duration) (store.KeyValueEntry, bool, error) {
+					return store.KeyValueEntry{}, false, errors.New("some error related with store")
 				},
 			},
 		},
@@ -138,8 +138,8 @@ func TestStorageHandler(t *testing.T) {
 			httpMethod: http.MethodGet,
 			response:   "Internal server error\n",
 			store: store.FakeStore{
-				GetFunc: func(key string) (string, bool, error) {
-					return "", false, errors.New("some error related with store")
+				GetFunc: func(key string) (store.KeyValueEntry, bool, error) {
+					return store.KeyValueEntry{}, false, errors.New("some error related with store")
 				},
 			},
 		},

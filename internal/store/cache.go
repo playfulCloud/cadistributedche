@@ -3,115 +3,90 @@ package store
 import (
 	"context"
 	"log/slog"
-	"sync"
 	"time"
-
-	"github.com/playfulCloud/cadistributedche/internal/metrics"
 )
 
 type Store interface {
-	Put(key string, value string, ttl time.Duration) (string, bool, error)
-	Get(key string) (string, bool, error)
+	Put(key string, value string, ttl time.Duration) (KeyValueEntry, bool, error)
+	Get(key string) (KeyValueEntry, bool, error)
 	Delete(key string) (bool, error)
+	Size() int
 }
 
 type ExpiringStore interface {
-	CleanupExpired()
+	Store
+	CleanupExpired() int
 }
 
 type KeyValueStore struct {
 	storage map[string]KeyValueEntry
-	mutex   sync.RWMutex
 	clock   Clock
-	metrics metrics.CacheStatsCollector
 	ttl     time.Duration
 }
 
-type KeyValueEntry struct {
-	key       string
-	value     string
-	createdAt time.Time
-	ttl       time.Duration
-}
-
-func NewKeyValueStore(clock Clock, metrics metrics.CacheStatsCollector, ttl time.Duration) *KeyValueStore {
+func NewKeyValueStore(clock Clock, ttl time.Duration) *KeyValueStore {
 	return &KeyValueStore{
 		storage: make(map[string]KeyValueEntry),
 		clock:   clock,
 		ttl:     ttl,
-		metrics: metrics,
 	}
 }
 
-func (k *KeyValueStore) Put(key string, value string, ttl time.Duration) (string, bool, error) {
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
-
+func (k *KeyValueStore) Put(key string, value string, ttl time.Duration) (KeyValueEntry, bool, error) {
 	previousEntry, exists := k.storage[key]
 	entryTtl := ttl
 	if ttl == 0 {
 		entryTtl = k.ttl
 	}
 
-	k.storage[key] = KeyValueEntry{
+	entry := KeyValueEntry{
 		key:       key,
 		value:     value,
 		createdAt: k.clock.Now(),
 		ttl:       entryTtl,
 	}
-	k.metrics.IncreaseWrites()
-	k.metrics.SetKeys(uint64(len(k.storage)))
 
-	if !exists || k.isExpired(previousEntry) {
-		return "", false, nil
+	k.storage[key] = entry
+
+	if !exists || previousEntry.isExpired(k.clock.Now()) {
+		return KeyValueEntry{}, false, nil
 	}
 
-	return previousEntry.value, true, nil
+	return previousEntry, true, nil
 
 }
 
-func (k *KeyValueStore) Get(key string) (string, bool, error) {
-	k.mutex.RLock()
-	defer k.mutex.RUnlock()
-
+func (k *KeyValueStore) Get(key string) (KeyValueEntry, bool, error) {
 	entry, exists := k.storage[key]
-	if !exists || k.isExpired(entry) {
-		k.metrics.IncreaseMisses()
-		return "", false, nil
-	}
-	k.metrics.IncreaseHits()
 
-	return entry.value, exists, nil
+	if !exists || entry.isExpired(k.clock.Now()) {
+		return KeyValueEntry{}, false, nil
+	}
+
+	return entry, true, nil
 
 }
 
 func (k *KeyValueStore) Delete(key string) (bool, error) {
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
 	entry, exists := k.storage[key]
-	if !exists || k.isExpired(entry) {
-		k.metrics.IncreaseMisses()
+	if !exists || entry.isExpired(k.clock.Now()) {
 		return false, nil
 	}
 
 	delete(k.storage, key)
-
-	k.metrics.IncreaseDeletes()
-	k.metrics.SetKeys(uint64(len(k.storage)))
-
 	return true, nil
 }
 
-func (k *KeyValueStore) CleanupExpired() {
+func (k *KeyValueStore) Size() int {
+	return len(k.storage)
+}
+
+func (k *KeyValueStore) CleanupExpired() int {
 	startedAt := time.Now()
 	removed := 0
 
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
-
 	for key, value := range k.storage {
-		if k.isExpired(value) {
-			k.metrics.IncreaseExpired()
+		if value.isExpired(k.clock.Now()) {
 			delete(k.storage, key)
 			removed++
 		}
@@ -122,7 +97,6 @@ func (k *KeyValueStore) CleanupExpired() {
 		level = slog.LevelInfo
 	}
 
-	k.metrics.SetKeys(uint64(len(k.storage)))
 	slog.Log(
 		context.Background(),
 		level,
@@ -131,14 +105,5 @@ func (k *KeyValueStore) CleanupExpired() {
 		"remaining", len(k.storage),
 		"duration_ms", time.Since(startedAt).Milliseconds(),
 	)
-}
-
-func (k *KeyValueStore) isExpired(entry KeyValueEntry) bool {
-	if entry.ttl <= 0 {
-		return false
-	}
-
-	t := k.clock.Now()
-	diff := t.Sub(entry.createdAt)
-	return diff >= entry.ttl
+	return removed
 }

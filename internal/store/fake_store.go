@@ -6,38 +6,40 @@ import (
 )
 
 type FakeStore struct {
-	PutFunc    func(key string, value string, ttl time.Duration) (string, bool, error)
-	GetFunc    func(key string) (string, bool, error)
-	DeleteFunc func(key string) (bool, error)
+	PutFunc            func(key string, value string, ttl time.Duration) (KeyValueEntry, bool, error)
+	GetFunc            func(key string) (KeyValueEntry, bool, error)
+	DeleteFunc         func(key string) (bool, error)
+	SizeFunc           func() int
+	CleanupExpiredFunc func() int
 }
 
-func (f *FakeStore) Get(key string) (string, bool, error) {
+func (f *FakeStore) Get(key string) (KeyValueEntry, bool, error) {
 	if f.GetFunc != nil {
 		return f.GetFunc(key)
 	}
 	if key == "empty" {
-		return "", false, nil
+		return KeyValueEntry{}, false, nil
 	}
 	if key == "empty-value" {
-		return "", true, nil
+		return KeyValueEntry{key: key}, true, nil
 	}
-	return "value", true, nil
+	return KeyValueEntry{key: key, value: "value"}, true, nil
 }
 
-func (f *FakeStore) Put(key string, value string, ttl time.Duration) (string, bool, error) {
+func (f *FakeStore) Put(key string, value string, ttl time.Duration) (KeyValueEntry, bool, error) {
 	if f.PutFunc != nil {
 		return f.PutFunc(key, value, ttl)
 	}
 	if key == "exists" {
-		return "previousValue", true, nil
+		return KeyValueEntry{key: key, value: value, ttl: ttl}, true, nil
 	}
 	if key == "empty-value" {
-		return "", true, nil
+		return KeyValueEntry{key: key, value: value, ttl: ttl}, true, nil
 	}
 	if key == "error" {
-		return "", false, errors.New("some error related with store")
+		return KeyValueEntry{}, false, errors.New("some error related with store")
 	}
-	return "", false, nil
+	return KeyValueEntry{}, false, nil
 }
 
 func (f *FakeStore) Delete(key string) (bool, error) {
@@ -48,4 +50,19 @@ func (f *FakeStore) Delete(key string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (f *FakeStore) Size() int {
+	if f.SizeFunc != nil {
+		return f.SizeFunc()
+	}
+	return 0
+}
+
+func (f *FakeStore) CleanupExpired() int {
+	if f.CleanupExpiredFunc != nil {
+		return f.CleanupExpiredFunc()
+	}
+
+	return 0
 }

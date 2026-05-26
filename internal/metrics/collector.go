@@ -26,7 +26,7 @@ type CacheStatsCollector interface {
 	IncreaseDeletes()
 	IncreaseWrites()
 	SetKeys(keys uint64)
-	IncreaseExpired()
+	IncreaseExpired(amount uint64)
 }
 
 type CacheStatsReader interface {
@@ -53,8 +53,8 @@ func (m *MetricsCollector) SetKeys(keys uint64) {
 	m.keys.Store(keys)
 }
 
-func (m *MetricsCollector) IncreaseExpired() {
-	m.expired.Add(1)
+func (m *MetricsCollector) IncreaseExpired(amount uint64) {
+	m.expired.Add(amount)
 }
 
 func (m *MetricsCollector) GetStats() CacheStats {

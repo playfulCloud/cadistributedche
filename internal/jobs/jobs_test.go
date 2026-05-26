@@ -11,8 +11,9 @@ func TestRunTTL(t *testing.T) {
 	sent := make(chan struct{})
 
 	go func() {
-		RunTTL(ctx, func() {
+		RunTTL(ctx, func() int {
 			sent <- struct{}{}
+			return 0
 		}, 1*time.Millisecond)
 	}()
 
@@ -29,7 +30,8 @@ func TestRunTTLClosingJob(t *testing.T) {
 	cancel()
 	go func() {
 		defer close(done)
-		RunTTL(ctx, func() {
+		RunTTL(ctx, func() int {
+			return 0
 		}, 1*time.Millisecond)
 	}()
 

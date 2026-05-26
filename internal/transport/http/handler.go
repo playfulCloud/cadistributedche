@@ -84,7 +84,7 @@ func (h *StorageHandler) handleGetCache(w http.ResponseWriter, r *http.Request) 
 
 	writeJson(w, http.StatusOK, map[string]string{
 		"key":   key,
-		"value": value,
+		"value": value.Value(),
 	})
 
 }

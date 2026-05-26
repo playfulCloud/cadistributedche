@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func RunTTL(ctx context.Context, ttlExecutorFunction func(), tickDuration time.Duration) {
+func RunTTL(ctx context.Context, ttlExecutorFunction func() int, tickDuration time.Duration) {
 	ticker := time.NewTicker(tickDuration)
 	defer ticker.Stop()
 

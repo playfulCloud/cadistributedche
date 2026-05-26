@@ -34,7 +34,9 @@ func main() {
 	}
 
 	metricsCollector := &metrics.MetricsCollector{}
-	storage := store.NewKeyValueStore(&store.ClockProvider{}, metricsCollector, cfg.Store.Ttl)
+	keyValueStore := store.NewKeyValueStore(&store.ClockProvider{}, cfg.Store.Ttl)
+	metricsStore := store.NewMetricsStore(keyValueStore, metricsCollector)
+	storage := store.NewBlockingStore(metricsStore)
 	storageHandler := http.NewStorageHandler(storage)
 	statsHandler := http.NewStatsHandler(metricsCollector)
 	server := http.NewServer(storageHandler, statsHandler, cfg.Server)

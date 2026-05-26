@@ -48,6 +48,6 @@ func (f *FakeMetricsCollector) SetKeys(keys uint64) {
 	f.Keys = keys
 }
 
-func (f *FakeMetricsCollector) IncreaseExpired() {
-	f.Expired++
+func (f *FakeMetricsCollector) IncreaseExpired(amount uint64) {
+	f.Expired += int(amount)
 }
